@@ -1,0 +1,60 @@
+# YuHuang Backend Configuration
+# LLM settings can be overridden via fcitx5 GUI (TriggerKey, LLMBaseUrl, etc.)
+
+backend:
+  # Unix Domain Socket path (must match fcitx5 plugin config)
+  socket_path: /tmp/yuhuang-backend.sock
+
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  log_level: INFO
+
+# Audio capture settings
+audio:
+  # Sample rate (Hz)
+  sample_rate: 16000
+  # Number of channels
+  channels: 1
+  # Frame size in samples (300ms @ 16kHz)
+  frame_size: 4800
+  # Audio device name or ID (leave empty for default)
+  device: ""
+
+# VAD (Voice Activity Detection) settings
+vad:
+  # Silence timeout in seconds before segment finalization
+  silence_timeout: 0.8
+  # Volume threshold (RMS normalized) — 调低以适应低灵敏度麦克风
+  volume_threshold: 0.003
+  # Leading silence tolerance (seconds before first speech)
+  leading_silence_timeout: 3.0
+
+# ASR (Automatic Speech Recognition) settings
+asr:
+  # FunASR model names
+  online_model: paraformer-zh-streaming
+  offline_model: damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch
+  vad_model: fsmn-vad
+  punc_model: ct-punc
+  # Intermediate result push interval (seconds)
+  intermediate_interval: 0.3
+  # Compute device: "cuda" (auto-detect GPU 0), "cuda:1" (GPU 1), "mps" (Apple GPU), "cpu"
+  device: cuda
+
+# LLM optimization settings (overridable by fcitx5 GUI)
+llm:
+  # Enable LLM optimization
+  enabled: false
+  # OpenAI-compatible API endpoint
+  base_url: http://localhost:8000/v1
+  # API key
+  api_key: token-abc123
+  # Model name
+  model: qwen2.5-7b-instruct
+  # Temperature (0.0 - 1.0)
+  temperature: 0.3
+  # Max output tokens
+  max_tokens: 2000
+  # Delay before starting LLM optimization (seconds)
+  optimize_delay: 0.5
+  # Delay before auto-committing after LLM completion (seconds)
+  auto_commit_delay: 0.2

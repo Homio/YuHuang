@@ -1,0 +1,39 @@
+# Build artifacts
+build/
+cmake-build-*/
+*.o
+*.so
+*.cmake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backend runtime
+*.sock
+
+# Logs
+*.log
+*.log.*
