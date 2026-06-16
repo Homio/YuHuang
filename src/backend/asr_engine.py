@@ -275,7 +275,7 @@ class ASREngine:
         FIRST_AUDIO_S = 1.5      # 首轮音频兜底
         MIN_INTERVAL = 1.0       # 最小间隔秒数（SenseVoice 很快，可高频）
         POLL_INTERVAL = 0.3      # 轮询间隔
-        STATUS_EVERY = 6         # 每 ~1.8s 输出一次状态心跳
+        STATUS_EVERY = 17        # 每 ~5s 输出一次状态心跳 (POLL_INTERVAL=0.3s)
 
         _last_offline_at = 0.0
         _cycle_count = 0

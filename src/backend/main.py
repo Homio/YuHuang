@@ -8,6 +8,7 @@ import logging
 import logging.handlers
 import argparse
 import json
+import subprocess
 from pathlib import Path
 
 # Strip proxy env vars to avoid SOCKS proxy interfering with urllib3/httpx
@@ -94,11 +95,12 @@ def setup_logging(level: str = "INFO", log_file: str = ""):
         except Exception:
             pass
 
-    # 2) Build handlers (StreamHandler now points to the file writer)
-    handlers = [logging.StreamHandler(sys.stderr)]
-
-    # Also add a WatchedFileHandler so logging module writes even if
-    # stdout/stderr are monkey-patched away by another library.
+    # 2) Build handler — WatchedFileHandler writes Python logging directly
+    #    to the log file and auto-recreates it on delete/rotation.
+    #    (stdout/stderr are redirected separately above to capture C library
+    #    debug output from funasr, which writes to the same file but won't
+    #    duplicate because it's a different stream.)
+    handlers: list[logging.Handler] = []
     if log_file:
         try:
             fh = logging.handlers.WatchedFileHandler(log_file)
@@ -106,6 +108,9 @@ def setup_logging(level: str = "INFO", log_file: str = ""):
             handlers.append(fh)
         except Exception:
             pass
+    # Fallback: if no log file or file handler failed, use stderr
+    if not handlers:
+        handlers.append(logging.StreamHandler(sys.stderr))
 
     logging.basicConfig(
         level=getattr(logging, level.upper()),
@@ -135,6 +140,10 @@ def main():
                         help="Log file path (auto-reopened if deleted)")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="Enable verbose logging")
+    parser.add_argument("--memory-limit", type=int, default=0,
+                        help="Hard memory limit in MB (default: 0 = disabled). "
+                             "A watchdog process will SIGKILL the backend "
+                             "if RSS exceeds this value.")
     args = parser.parse_args()
 
     setup_logging("DEBUG" if args.verbose else "INFO", log_file=args.log_file)
@@ -547,10 +556,40 @@ def main():
         if asr_engine:
             asr_engine.start_processing()
 
+        # ★ 内存守护进程（独立子进程，硬限制）
+        _watchdog_proc = None
+        mem_limit = args.memory_limit
+        if mem_limit > 0:
+            _watchdog_script = str(Path(__file__).parent.parent / "tools" / "memory_watchdog.py")
+            try:
+                _watchdog_proc = subprocess.Popen(
+                    [
+                        sys.executable,
+                        _watchdog_script,
+                        "--pid", str(os.getpid()),
+                        "--limit-mb", str(mem_limit),
+                        "--restart-cmd",
+                        f"yuhuang-backend --memory-limit {mem_limit}",
+                    ],
+                    start_new_session=True,
+                )
+                logger.info(
+                    f"Memory watchdog started (PID {_watchdog_proc.pid}, "
+                    f"limit={mem_limit}MB)"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to start memory watchdog: {e}")
+                _watchdog_proc = None
+
         logger.info(f"Unix socket listening on: {socket_path}")
         logger.info("Audio capture started")
         logger.info("YuHuang Backend is ready!")
         logger.info("")
+        if _watchdog_proc:
+            logger.info(
+                f"  Memory limit: {mem_limit}MB "
+                f"(hard watchdog PID {_watchdog_proc.pid})"
+            )
         logger.info("Usage:")
         logger.info("  Hold the trigger key (default: Right Ctrl) to speak")
         logger.info("  Release trigger key -> text appears at cursor")
@@ -563,7 +602,7 @@ def main():
         await stop_event.wait()
 
         logger.info("Shutting down...")
-        audio_capture.stop()
+        await audio_capture.stop()
         server.stop()
         if asr_engine:
             await asr_engine.stop_processing()
